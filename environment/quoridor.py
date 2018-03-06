@@ -1,5 +1,5 @@
 import numpy as np
-import logging
+import logwood
 from queue import Queue
 from enum import Enum
 
@@ -11,11 +11,11 @@ class Quoridor:
     HORIZONTAL = 1
     VERTICAL = -1
 
-    def __init__(self):
-        pass
+    def __init__(self, safe=False):
+        self._logger = logwood.get_logger(f"{self.__class__.__name__}")
+        self.safe = safe
 
-
-    def load_state(self, player1, player2):
+    def load_players(self, player1, player2):
         # Handshake with players
         self.player1 = player1
         self.player2 = player2
@@ -54,11 +54,19 @@ class Quoridor:
         self._player2_walls_remaining = 10
 
     def get_state(self, player=1):
+        """Returns a set of 9x9 planes that represent the game state.
+        1. The current player position
+        2. The opponent position
+        3. Vertical Walls
+        4. Horizontal Walls
+        5 - 14. Number of walls remaining for current player
+        15 - 24. Number of walls remaining for opponent
+        """
         player1_position_plane = self.tiles.copy()
         player1_position_plane[self._positions[1]] = 1
         player1_position_plane = player1_position_plane.reshape([9, 9])
 
-        player2_position_plane = self.tiles.copy()
+        player2_position_planne = self.tiles.copy()
         player2_position_plane[self._positions[2]] = 1
         player2_position_plane = player2_position_plane.reshape([9, 9])
 
@@ -101,6 +109,7 @@ class Quoridor:
                 player2_position_plane,
             ])
             state = np.vstack([state, player1_walls_plane, player2_walls_plane])
+
         if player == 2:
             state = np.stack([
                 no_walls,
@@ -111,7 +120,6 @@ class Quoridor:
             ])
 
             state = np.vstack([state, player2_walls_plane, player1_walls_plane])
-
 
         return state
 
@@ -143,6 +151,89 @@ class Quoridor:
         return pawn_actions + wall_actions
 
 
+    def play(self):
+        """Plays an entire game and returns the winner"""
+        winner = None
+        while not winner:
+            if self.current_player == 1:
+                action = self.player1.choose_action()
+            else:
+                action = self.player2.choose_action()
+            self._logger.info(f"Player {2} chooses action {action}")
+            winner = self.step(action)
+        self._logger.info(f"Winner is {winner.name}")
+
+    def step(self, action):
+        """Take a step in the environment given the current action"""
+        player = self.current_player
+        if self.safe:
+            if not action in self.valid_actions:
+                raise ValueError(f"Invalid Action: {action}")
+
+        if action < 12:
+            self._handle_pawn_action(action, player)
+        else:
+            self._handle_wall_action(action - 12)
+
+        winner = self.is_endgame()
+        if winner:
+            return winner
+        else:
+            self.rotate_players()
+            return None
+
+    def is_endgame(self):
+        if self._positions[2] < 9:
+            return self.player2
+        elif self._positions[1] > 71:
+            return self.player1
+        else:
+            return None
+
+    def _handle_pawn_action(self, action, player):
+        if action == self._DIRECTIONS['N']:
+            self._positions[player] += 9
+        elif action == self._DIRECTIONS['S']:
+            self._positions[player] -= 9
+        elif action == self._DIRECTIONS['E']:
+            self._positions[player] += 1
+        elif action == self._DIRECTIONS['W']:
+            self._positions[player] -= 1
+        elif action == self._DIRECTIONS['NN']:
+            self._positions[player] += 18
+        elif action == self._DIRECTIONS['SS']:
+            self._positions[player] -= 18
+        elif action == self._DIRECTIONS['EE']:
+            self._positions[player] += 2
+        elif action == self._DIRECTIONS['WW']:
+            self._positions[player] -= 2
+        elif action == self._DIRECTIONS['NW']:
+            self._positions[player] += 8
+        elif action == self._DIRECTIONS['NE']:
+            self._positions[player] += 10
+        elif action == self._DIRECTIONS['SW']:
+            self._positions[player] -= 10
+        elif action == self._DIRECTIONS['SE']:
+            self._positions[player] -= 8
+        else:
+            raise ValueError(f"Invalid Pawn Action: {action}")
+
+    def _handle_wall_action(self, action):
+        # Action values less than 64 are horizontal walls
+        if action < 64:
+            self._intersections[action] = 1
+        # Action values above 64 are vertical walls
+        else:
+            self._intersections[action - 64] = -1
+
+    def rotate_players(self):
+        """Switch the player turn"""
+        if self.current_player == 1:
+            self.current_player = 2
+        else:
+            self.current_player = 1
+
+
     def _valid_pawn_actions(self, walls, location, opponent_loc, player=1):
         HORIZONTAL = 1
         VERTICAL = -1
@@ -171,7 +262,8 @@ class Quoridor:
 
         if opponent_north and intersections['NE'] != HORIZONTAL and intersections['NW'] != HORIZONTAL:
             n_intersections = self._get_intersections(walls, opponent_loc)
-            if n_intersections['NW'] != HORIZONTAL and n_intersections['NE'] != HORIZONTAL:
+            if n_intersections['NW'] != HORIZONTAL and n_intersections['NE'] != HORIZONTAL \
+                or (current_row == 7 and player == 1):
                 valid.append(self._DIRECTIONS['NN'])
 
             if n_intersections['NE'] != VERTICAL and intersections['NE'] != VERTICAL:
@@ -183,7 +275,8 @@ class Quoridor:
 
         if opponent_south and intersections['SE'] != VERTICAL and intersections['SW'] != VERTICAL:
             s_intersections = self._get_intersections(walls, opponent_loc)
-            if s_intersections['SW'] != HORIZONTAL and s_intersections['SE'] != HORIZONTAL:
+            if s_intersections['SW'] != HORIZONTAL and s_intersections['SE'] != HORIZONTAL \
+                or (current_row == 1 and player == 2):
                 valid.append(self._DIRECTIONS['SS'])
 
             if s_intersections['SE'] != VERTICAL and intersections['SE'] != VERTICAL:
@@ -207,6 +300,7 @@ class Quoridor:
 
 
     def _get_intersections(self, intersections, current_tile):
+        """Gets the four intersections for a given tile."""
         location_row = current_tile // self.N_ROWS
 
         n_border = current_tile > 71
@@ -318,8 +412,8 @@ class Quoridor:
 
 
     def _blocks_path(self, wall_location, orientation):
-        player1_target = 9
-        player2_target = -1
+        player1_target = 8
+        player2_target = 0
 
         player1_position = self._positions[1]
         player2_position = self._positions[2]
@@ -343,6 +437,7 @@ class Quoridor:
 
         while not target_visited and not visit_queue.empty():
             current_position = visit_queue.get()
+            self._logger.debug(f"Current Position {current_position}")
             valid_directions = self._valid_pawn_actions(intersections,
                                     location=current_position,
                                     opponent_loc=opponent_position,
