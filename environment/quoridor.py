@@ -145,8 +145,8 @@ class Quoridor:
         pawn_actions = self._valid_pawn_actions(location=location,
                         opponent_loc=opponent_loc, walls=walls, player=player)
 
-        if ((self.current_player == 1 and self._player1_walls_remaining > 1)
-            or (self.current_player == 2 and self._player2_walls_remaining > 1)):
+        if ((self.current_player == 1 and self._player1_walls_remaining > 0)
+            or (self.current_player == 2 and self._player2_walls_remaining > 0)):
             wall_actions = self._valid_wall_actions()
 
             # Adjust for the pawn actions (which go up to 12)
@@ -290,7 +290,7 @@ class Quoridor:
                 valid.append(self._DIRECTIONS['NW'])
 
 
-        if opponent_south and intersections['SE'] != VERTICAL and intersections['SW'] != VERTICAL:
+        elif opponent_south and intersections['SE'] != HORIZONTAL and intersections['SW'] != HORIZONTAL:
             s_intersections = self._get_intersections(walls, opponent_loc)
             if s_intersections['SW'] != HORIZONTAL and s_intersections['SE'] != HORIZONTAL \
                 or (current_row == 1 and player == 2):
@@ -305,13 +305,26 @@ class Quoridor:
 
         elif opponent_east and intersections['SE'] != VERTICAL and intersections['NE'] != VERTICAL:
             e_intersections = self._get_intersections(walls, opponent_loc)
-            if e_intersections['SE'] != VERTICAL and e_intersections['SW'] != VERTICAL:
+            if e_intersections['SE'] != VERTICAL and e_intersections['NE'] != VERTICAL:
                 valid.append(self._DIRECTIONS['EE'])
+
+            if e_intersections['NE'] != HORIZONTAL:
+                valid.append(self._DIRECTIONS['NE'])
+
+            if e_intersections['SE'] != HORIZONTAL:
+                valid.append(self._DIRECTIONS['SE'])
+
 
         elif opponent_west and intersections['SW'] != VERTICAL and intersections['NW'] != VERTICAL:
             w_intersections = self._get_intersections(walls, opponent_loc)
-            if w_intersections['SE'] != VERTICAL and w_intersections['SW'] != VERTICAL:
+            if w_intersections['NW'] != VERTICAL and w_intersections['SW'] != VERTICAL:
                 valid.append(self._DIRECTIONS['WW'])
+
+            if w_intersections['NW'] != HORIZONTAL:
+                valid.append(self._DIRECTIONS['NW'])
+
+            if w_intersections['SW'] != HORIZONTAL:
+                valid.append(self._DIRECTIONS['SW'])
 
         return valid
 
