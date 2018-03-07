@@ -15,7 +15,7 @@ class Quoridor:
         self._logger = logwood.get_logger(f"{self.__class__.__name__}")
         self.safe = safe
 
-    def load_players(self, player1, player2):
+    def load(self, player1, player2):
         # Handshake with players
         self.player1 = player1
         self.player2 = player2
@@ -144,10 +144,15 @@ class Quoridor:
 
         pawn_actions = self._valid_pawn_actions(location=location,
                         opponent_loc=opponent_loc, walls=walls, player=player)
-        wall_actions = self._valid_wall_actions()
 
-        # Adjust for the pawn actions (which go up to 12)
-        wall_actions = [action + 12 for action in wall_actions]
+        if ((self.current_player == 1 and self._player1_walls_remaining > 1)
+            or (self.current_player == 2 and self._player2_walls_remaining > 1)):
+            wall_actions = self._valid_wall_actions()
+
+            # Adjust for the pawn actions (which go up to 12)
+            wall_actions = [action + 12 for action in wall_actions]
+        else:
+            wall_actions = []
         return pawn_actions + wall_actions
 
 
@@ -155,15 +160,20 @@ class Quoridor:
         """Plays an entire game and returns the winner"""
         winner = None
         while not winner:
-            if self.current_player == 1:
-                action = self.player1.choose_action()
-            else:
-                action = self.player2.choose_action()
-            self._logger.info(f"Player {2} chooses action {action}")
-            winner = self.step(action)
+            winner = self.step()
         self._logger.info(f"Winner is {winner.name}")
 
-    def step(self, action):
+    def step(self):
+        if self.current_player == 1:
+            action = self.player1.choose_action()
+        else:
+            action = self.player2.choose_action()
+        self._logger.info(f"Player {self.current_player} chooses action {action}")
+        winner = self.take_action(action)
+        return winner
+
+
+    def take_action(self, action):
         """Take a step in the environment given the current action"""
         player = self.current_player
         if self.safe:
@@ -226,8 +236,15 @@ class Quoridor:
         else:
             self._intersections[action - 64] = -1
 
+        if self.current_player == 1:
+            self._player1_walls_remaining -= 1
+        else:
+            self._player2_walls_remaining -= 1
+        self._logger.info(self._intersections)
+
     def rotate_players(self):
         """Switch the player turn"""
+        self._logger.debug("Rotating Player")
         if self.current_player == 1:
             self.current_player = 2
         else:
@@ -354,11 +371,11 @@ class Quoridor:
         # No borders
         else:
             ne_intersection = intersections[current_tile - location_row]
-            nw_intersection = ne_intersection = intersections[current_tile - location_row - 1]
+            nw_intersection = intersections[current_tile - location_row - 1]
             sw_intersection = intersections[(current_tile - 9) - (location_row - 1) - 1]
             se_intersection = intersections[(current_tile - 9) - (location_row - 1)]
 
-
+        self._logger.debug(ne_intersection)
         return {'NW' : nw_intersection,
                 'NE' : ne_intersection,
                 'SE' : se_intersection,
@@ -437,7 +454,6 @@ class Quoridor:
 
         while not target_visited and not visit_queue.empty():
             current_position = visit_queue.get()
-            self._logger.debug(f"Current Position {current_position}")
             valid_directions = self._valid_pawn_actions(intersections,
                                     location=current_position,
                                     opponent_loc=opponent_position,

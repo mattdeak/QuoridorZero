@@ -1,4 +1,5 @@
 from .base import BaseAgent
+
 class ManualCLIAgent(BaseAgent):
 
     def choose_action(self):
@@ -13,3 +14,26 @@ class ManualCLIAgent(BaseAgent):
             print(valid)
             action = int(input("Choose Action: "))
         return action
+
+
+class ManualPygameAgent(BaseAgent):
+    def __init__(self, name):
+        self.name = name
+        self._action = None
+
+
+    def receive_action(self, action):
+        self._action = action
+
+    def choose_action(self):
+        return self._action
+
+class HistoricalPygameAgent(BaseAgent):
+
+    def __init__(self, name, moveset):
+        self.name = name
+        self.moveset = moveset
+
+    def choose_action(self):
+        for move in self.moveset:
+            yield move
