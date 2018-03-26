@@ -6,7 +6,7 @@ class ManualCLIAgent(BaseAgent):
         print("Current Board")
         self.environment.print_board()
         print("Available Actions")
-        valid = self.environment.valid_actions
+        valid = self.environment.actions
         print(valid)
         action = int(input("Choose Action: "))
         while action not in valid:

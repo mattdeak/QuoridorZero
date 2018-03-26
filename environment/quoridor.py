@@ -66,7 +66,7 @@ class Quoridor:
         player1_position_plane[self._positions[1]] = 1
         player1_position_plane = player1_position_plane.reshape([9, 9])
 
-        player2_position_planne = self.tiles.copy()
+        player2_position_plane = self.tiles.copy()
         player2_position_plane[self._positions[2]] = 1
         player2_position_plane = player2_position_plane.reshape([9, 9])
 
@@ -128,7 +128,7 @@ class Quoridor:
 
     def load_state(self, state):
         """Mutates the Quoridor object to match a given state"""
-        current player = state[-1] == np.zeros([9, 9])
+        current_player = state[-1] == np.zeros([9, 9])
         # TODO: Implement the rest of this
 
 
