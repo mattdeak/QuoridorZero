@@ -1,7 +1,6 @@
 import numpy as np
 import logwood
 from queue import Queue
-from enum import Enum
 
 # Helper class
 
@@ -15,14 +14,13 @@ class Quoridor:
         self._logger = logwood.get_logger(f"{self.__class__.__name__}")
         self.safe = safe
 
-    def load(self, player1, player2):
-        # Handshake with players
-        self.player1 = player1
-        self.player2 = player2
-        player1.environment = self
-        player2.environment = self
+        self.action_space = 140 # 140 possible actions in total
+        self.n_players = 2
 
+
+    def reset(self):
         self.current_player = 1
+        self.last_player = -1
 
         # Initialize Tiles
         self.tiles = np.zeros(81)
@@ -53,7 +51,8 @@ class Quoridor:
         self._player1_walls_remaining = 10
         self._player2_walls_remaining = 10
 
-    def get_state(self, player=1):
+    @property
+    def state(self):
         """Returns a set of 9x9 planes that represent the game state.
         1. The current player position
         2. The opponent position
@@ -61,6 +60,7 @@ class Quoridor:
         4. Horizontal Walls
         5 - 14. Number of walls remaining for current player
         15 - 24. Number of walls remaining for opponent
+        25. Whose turn it is (0 for player 1, 1 for player 2)
         """
         player1_position_plane = self.tiles.copy()
         player1_position_plane[self._positions[1]] = 1
@@ -100,7 +100,7 @@ class Quoridor:
             )
 
         # Adjust the position of planes based on current player
-        if player == 1:
+        if self.current_player == 1:
             state = np.stack([
                 no_walls,
                 vertical_walls,
@@ -108,9 +108,11 @@ class Quoridor:
                 player1_position_plane,
                 player2_position_plane,
             ])
-            state = np.vstack([state, player1_walls_plane, player2_walls_plane])
 
-        if player == 2:
+            current_player_plane = np.zeros([9 ,9])
+            state = np.vstack([state, player1_walls_plane, player2_walls_plane, current_player_plane])
+
+        if self.current_player == 2:
             state = np.stack([
                 no_walls,
                 vertical_walls,
@@ -119,12 +121,19 @@ class Quoridor:
                 player1_position_plane,
             ])
 
-            state = np.vstack([state, player2_walls_plane, player1_walls_plane])
+            current_player_plane = np.ones([9 ,9])
+            state = np.vstack([state, player2_walls_plane, player1_walls_plane, current_player_plane])
 
         return state
 
+    def load_state(self, state):
+        """Mutates the Quoridor object to match a given state"""
+        current player = state[-1] == np.zeros([9, 9])
+        # TODO: Implement the rest of this
+
+
     @property
-    def valid_actions(self):
+    def actions(self):
         """The valid actions for the current gamestate"""
         # --------
         # There are 64 possible horizontal wall placements and
@@ -156,6 +165,8 @@ class Quoridor:
         return pawn_actions + wall_actions
 
 
+
+
     def play(self):
         """Plays an entire game and returns the winner"""
         winner = None
@@ -163,18 +174,9 @@ class Quoridor:
             winner = self.step()
         self._logger.info(f"Winner is {winner.name}")
 
-    def step(self):
-        if self.current_player == 1:
-            action = self.player1.choose_action()
-        else:
-            action = self.player2.choose_action()
-        self._logger.info(f"Player {self.current_player} chooses action {action}")
-        winner = self.take_action(action)
-        return winner
-
-
-    def take_action(self, action):
+    def step(self, action):
         """Take a step in the environment given the current action"""
+        self._logger.info(f"Player {self.current_player} chooses action {action}")
         player = self.current_player
         if self.safe:
             if not action in self.valid_actions:
@@ -185,20 +187,25 @@ class Quoridor:
         else:
             self._handle_wall_action(action - 12)
 
-        winner = self.is_endgame()
-        if winner:
-            return winner
+        rewards, done = self._get_rewards()
+        if done:
+            observation = None
         else:
             self.rotate_players()
-            return None
+            observation = self.get_state
 
-    def is_endgame(self):
+        return observation, rewards, done
+
+    def _get_rewards(self):
+        done = True
         if self._positions[2] < 9:
-            return self.player2
+            rewards, done = (1, -1)
         elif self._positions[1] > 71:
-            return self.player1
+            rewards = (-1, 1)
         else:
-            return None
+            rewards = (0, 0)
+            done = False
+        return rewards, done
 
     def _handle_pawn_action(self, action, player):
         if action == self._DIRECTIONS['N']:
@@ -247,8 +254,11 @@ class Quoridor:
         self._logger.debug("Rotating Player")
         if self.current_player == 1:
             self.current_player = 2
+            self.last_player = 1
+
         else:
             self.current_player = 1
+            self.last_player = 2
 
 
     def _valid_pawn_actions(self, walls, location, opponent_loc, player=1):
@@ -549,3 +559,6 @@ class Quoridor:
                         print(f'{none:4}', end='')
                 intersection_row -= 1
                 print()
+
+    def clone(self):
+        return Quoridor()
