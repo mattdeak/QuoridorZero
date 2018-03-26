@@ -2,9 +2,9 @@ import numpy as np
 
 class BaseAgent:
 
-    def __init__(self, name):
+    def __init__(self, name, environment=None):
         self.name = name
-        self.environment = None
+        self.environment = environment
 
     def choose_action(self):
         action = np.random.choice(self.environment.valid_actions)

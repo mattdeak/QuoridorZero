@@ -16,6 +16,7 @@ class Quoridor:
 
         self.action_space = 140 # 140 possible actions in total
         self.n_players = 2
+        self.reset()
 
 
     def reset(self):
@@ -109,7 +110,9 @@ class Quoridor:
                 player2_position_plane,
             ])
 
-            current_player_plane = np.zeros([9 ,9])
+            print(f'Shape is {state.shape}')
+
+            current_player_plane = np.zeros([1, 9 ,9])
             state = np.vstack([state, player1_walls_plane, player2_walls_plane, current_player_plane])
 
         if self.current_player == 2:
@@ -121,7 +124,7 @@ class Quoridor:
                 player1_position_plane,
             ])
 
-            current_player_plane = np.ones([9 ,9])
+            current_player_plane = np.ones([1, 9 ,9])
             state = np.vstack([state, player2_walls_plane, player1_walls_plane, current_player_plane])
 
         return state
@@ -163,16 +166,6 @@ class Quoridor:
         else:
             wall_actions = []
         return pawn_actions + wall_actions
-
-
-
-
-    def play(self):
-        """Plays an entire game and returns the winner"""
-        winner = None
-        while not winner:
-            winner = self.step()
-        self._logger.info(f"Winner is {winner.name}")
 
     def step(self, action):
         """Take a step in the environment given the current action"""
